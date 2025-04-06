@@ -1,12 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import axios from '../../api/axios';
 
 // Async thunks for property actions
 export const fetchProperties = createAsyncThunk(
   'property/fetchProperties',
   async (filters, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/api/properties', { params: filters });
+      const response = await axios.get('/properties', { params: filters });
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -18,7 +18,7 @@ export const fetchPropertyById = createAsyncThunk(
   'property/fetchPropertyById',
   async (id, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`/api/properties/${id}`);
+      const response = await axios.get(`/properties/${id}`);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -31,7 +31,7 @@ export const createProperty = createAsyncThunk(
   async (propertyData, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      const response = await axios.post('/api/properties', propertyData, {
+      const response = await axios.post('/properties', propertyData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return response.data;
@@ -46,7 +46,7 @@ export const updateProperty = createAsyncThunk(
   async ({ id, propertyData }, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      const response = await axios.put(`/api/properties/${id}`, propertyData, {
+      const response = await axios.put(`/properties/${id}`, propertyData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return response.data;
@@ -61,7 +61,7 @@ export const deleteProperty = createAsyncThunk(
   async (id, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      await axios.delete(`/api/properties/${id}`, {
+      await axios.delete(`/properties/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return id;
@@ -76,7 +76,7 @@ export const toggleLikeProperty = createAsyncThunk(
   async (id, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      const response = await axios.post(`/api/properties/${id}/like`, {}, {
+      const response = await axios.post(`/properties/${id}/like`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return { id, likes: response.data.likes };

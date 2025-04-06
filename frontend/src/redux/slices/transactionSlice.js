@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import axios from '../../api/axios';
 
 // Async thunks for transaction actions
 export const createTransaction = createAsyncThunk(
@@ -7,7 +7,7 @@ export const createTransaction = createAsyncThunk(
   async (transactionData, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      const response = await axios.post('/api/transactions', transactionData, {
+      const response = await axios.post('/transactions', transactionData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return response.data;
@@ -23,7 +23,7 @@ export const completeTransaction = createAsyncThunk(
     try {
       const { token } = getState().auth;
       const response = await axios.put(
-        `/api/transactions/${transactionId}/complete`,
+        `/transactions/${transactionId}/complete`,
         { paymentMethod },
         { headers: { Authorization: `Bearer ${token}` }}
       );
@@ -39,7 +39,7 @@ export const fetchUserTransactions = createAsyncThunk(
   async (_, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      const response = await axios.get('/api/transactions', {
+      const response = await axios.get('/transactions', {
         headers: { Authorization: `Bearer ${token}` }
       });
       return response.data;
@@ -54,7 +54,7 @@ export const fetchTransactionById = createAsyncThunk(
   async (id, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      const response = await axios.get(`/api/transactions/${id}`, {
+      const response = await axios.get(`/transactions/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return response.data;
@@ -69,7 +69,7 @@ export const cancelTransaction = createAsyncThunk(
   async (id, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      const response = await axios.put(`/api/transactions/${id}/cancel`, {}, {
+      const response = await axios.put(`/transactions/${id}/cancel`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       return response.data;

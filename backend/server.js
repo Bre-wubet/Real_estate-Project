@@ -3,6 +3,11 @@ import dotenv from "dotenv";
 import cors from "cors";
 import mongoose from "mongoose";
 
+// Import routes
+import authRoutes from './routes/auth.js';
+import propertyRoutes from './routes/property.js';
+import transactionRoutes from './routes/transaction.js';
+
 dotenv.config();
 const app = express();
 
@@ -12,7 +17,7 @@ app.use(cors());
 
 // Environment variables
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/real-estate";
+const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/RealEstate";
 
 // Database connection
 mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -23,6 +28,11 @@ mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to Real Estate Management System API" });
 });
+
+// Routes
+app.use('/auth', authRoutes);
+app.use('/properties', propertyRoutes);
+app.use('/transactions', transactionRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
