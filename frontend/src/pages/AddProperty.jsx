@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { createProperty } from '../redux/slices/propertySlice';
 
 const AddProperty = () => {
   const dispatch = useDispatch();
@@ -74,12 +75,44 @@ const AddProperty = () => {
     }
 
     try {
-      // TODO: Implement property creation action
-      // await dispatch(createProperty(formData)).unwrap();
+      const propertyFormData = new FormData();
+      
+      // Add basic property details
+      propertyFormData.append('title', formData.title);
+      propertyFormData.append('description', formData.description);
+      propertyFormData.append('type', formData.type);
+      propertyFormData.append('price', formData.price);
+      propertyFormData.append('status', formData.status);
+      
+      // Add location data
+      const locationData = {
+        address: formData.address,
+        city: formData.city || '',
+        state: formData.state || '',
+        zipCode: formData.zipCode || ''
+      };
+      propertyFormData.append('location', JSON.stringify(locationData));
+      
+      // Add features data
+      const featuresData = {
+        bedrooms: formData.bedrooms,
+        bathrooms: formData.bathrooms,
+        area: formData.area,
+        parking: formData.amenities.includes('Parking'),
+        furnished: formData.amenities.includes('Furnished')
+      };
+      propertyFormData.append('features', JSON.stringify(featuresData));
+      
+      // Add images
+      formData.images.forEach((image) => {
+        propertyFormData.append('images', image);
+      });
+
+      await dispatch(createProperty(propertyFormData)).unwrap();
       navigate('/properties');
     } catch (err) {
       setFormErrors({
-        submit: err.message || 'Failed to create property'
+        submit: err.response?.data?.message || err.message || 'Failed to create property'
       });
     }
   };

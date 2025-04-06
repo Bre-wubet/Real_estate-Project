@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
+import { fetchPropertyById, updateProperty } from '../redux/slices/propertySlice';
 
 const EditProperty = () => {
   const dispatch = useDispatch();
@@ -24,12 +25,20 @@ const EditProperty = () => {
   const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
-    // TODO: Fetch property data and set form data
-    // dispatch(fetchPropertyById(id)).then((result) => {
-    //   if (result.payload) {
-    //     setFormData(result.payload);
-    //   }
-    // });
+    const fetchProperty = async () => {
+      try {
+        const result = await dispatch(fetchPropertyById(id)).unwrap();
+        setFormData({
+          ...result,
+          images: [] // Reset images as they need to be re-uploaded
+        });
+      } catch (err) {
+        setFormErrors({
+          submit: err.response?.data?.message || err.message || 'Failed to fetch property'
+        });
+      }
+    };
+    fetchProperty();
   }, [dispatch, id]);
 
   const validateForm = () => {
@@ -84,8 +93,7 @@ const EditProperty = () => {
     }
 
     try {
-      // TODO: Implement property update action
-      // await dispatch(updateProperty({ id, ...formData })).unwrap();
+      await dispatch(updateProperty({ id, propertyData: formData })).unwrap();
       navigate('/properties');
     } catch (err) {
       setFormErrors({

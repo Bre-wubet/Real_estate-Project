@@ -3,8 +3,44 @@ import Property from "../models/Property.js";
 // Create new property listing
 export const createProperty = async (req, res) => {
   try {
+    // Parse location and features from form data
+    const locationData = req.body.location ? JSON.parse(req.body.location) : null;
+    const featuresData = req.body.features ? JSON.parse(req.body.features) : {};
+
+    // Validate required fields
+    if (!req.body.title || !req.body.description || !req.body.type || !req.body.price || !locationData) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    // Validate location fields
+    if (!locationData.address || !locationData.city || !locationData.state || !locationData.zipCode) {
+      return res.status(400).json({ message: "Missing required location fields" });
+    }
+
+    // Validate images
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "At least one image is required" });
+    }
+
+    // Validate file types
+    const validFileTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    const invalidFile = req.files.find(file => !validFileTypes.includes(file.mimetype));
+    if (invalidFile) {
+      return res.status(400).json({ message: "Invalid file type. Only JPEG, JPG and PNG are allowed" });
+    }
+
+    // Process and save images
+    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
+
     const property = new Property({
-      ...req.body,
+      title: req.body.title,
+      description: req.body.description,
+      type: req.body.type,
+      price: parseFloat(req.body.price),
+      status: req.body.status || "for-sale",
+      location: locationData,
+      features: featuresData,
+      images: imageUrls,
       owner: req.user.userId
     });
 

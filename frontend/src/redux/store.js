@@ -13,9 +13,19 @@ export const store = configureStore({
     getDefaultMiddleware({
       serializableCheck: {
         // Ignore these action types
-        ignoredActions: ['auth/login/fulfilled', 'auth/register/fulfilled'],
+        ignoredActions: [
+          'auth/login/fulfilled',
+          'auth/register/fulfilled',
+          'property/createProperty/pending',
+          'property/updateProperty/pending'
+        ],
         // Ignore these field paths in all actions
-        ignoredActionPaths: ['payload.token'],
+        ignoredActionPaths: [
+          'payload.token',
+          'meta.arg.images',
+          'meta.arg.propertyData.images',
+          'meta.arg'
+        ],
         // Ignore these paths in the state
         ignoredPaths: ['auth.token']
       }
