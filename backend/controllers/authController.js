@@ -56,16 +56,33 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    // Validate request body
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Missing required fields",
+        details: "Email and password are required"
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        message: "Invalid email format",
+        details: "Please provide a valid email address"
+      });
+    }
+
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({ message: "Invalid email or password" });
     }
 
     // Verify password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({ message: "Invalid email or password" });
     }
 
     // Generate JWT token

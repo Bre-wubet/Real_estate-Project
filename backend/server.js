@@ -78,8 +78,31 @@ app.use('/transactions', transactionRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Something went wrong!" });
+  console.error('Error details:', {
+    name: err.name,
+    message: err.message,
+    stack: err.stack
+  });
+
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({
+      message: 'File upload error',
+      details: err.message,
+      code: err.code
+    });
+  }
+
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      message: 'Validation error',
+      details: Object.values(err.errors).map(e => e.message)
+    });
+  }
+
+  res.status(500).json({
+    message: 'Internal server error',
+    details: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred'
+  });
 });
 
 // Start server

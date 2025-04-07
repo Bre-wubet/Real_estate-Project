@@ -1,68 +1,93 @@
 import { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
-import { fetchPropertyById, updateProperty } from '../redux/slices/propertySlice';
+import propertyApi from '../api/property';
 
 const EditProperty = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { id } = useParams();
-  const { loading, error } = useSelector((state) => state.property);
+  const { token } = useSelector((state) => state.auth);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     price: '',
-    address: '',
     type: 'house',
-    bedrooms: '',
-    bathrooms: '',
-    area: '',
-    images: [],
+    status: 'Available',
+    location: {
+      address: '',
+      city: '',
+      state: '',
+      zipCode: ''
+    },
+    features: {
+      bedrooms: '',
+      bathrooms: '',
+      area: '',
+      parking: false,
+      furnished: false
+    },
     amenities: [],
-    status: 'available'
+    images: []
   });
   const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
     const fetchProperty = async () => {
       try {
-        const result = await dispatch(fetchPropertyById(id)).unwrap();
+        setLoading(true);
+        const property = await propertyApi.getPropertyById(id);
         setFormData({
-          ...result,
+          title: property.title,
+          description: property.description,
+          price: property.price,
+          type: property.type,
+          status: property.status,
+          location: property.location,
+          features: property.features,
           images: [] // Reset images as they need to be re-uploaded
         });
       } catch (err) {
-        setFormErrors({
-          submit: err.response?.data?.message || err.message || 'Failed to fetch property'
-        });
+        setError(err.message || 'Failed to fetch property');
+      } finally {
+        setLoading(false);
       }
     };
     fetchProperty();
-  }, [dispatch, id]);
+  }, [id]);
 
   const validateForm = () => {
     const errors = {};
-    if (!formData.title) errors.title = 'Title is required';
-    if (!formData.description) errors.description = 'Description is required';
-    if (!formData.price) errors.price = 'Price is required';
-    if (!formData.address) errors.address = 'Address is required';
-    if (!formData.bedrooms) errors.bedrooms = 'Number of bedrooms is required';
-    if (!formData.bathrooms) errors.bathrooms = 'Number of bathrooms is required';
-    if (!formData.area) errors.area = 'Property area is required';
+    if (!formData.title?.trim()) errors.title = 'Title is required';
+    if (!formData.description?.trim()) errors.description = 'Description is required';
+    if (!formData.price || parseFloat(formData.price) <= 0) errors.price = 'Price must be a positive number';
+    if (!formData.location.address?.trim()) errors.address = 'Address is required';
+    if (!formData.location.city?.trim()) errors.city = 'City is required';
+    if (!formData.location.state?.trim()) errors.state = 'State is required';
+    if (!formData.location.zipCode?.trim()) errors.zipCode = 'Zip code is required';
+    if (!formData.features.bedrooms || parseInt(formData.features.bedrooms) <= 0) errors.bedrooms = 'Number of bedrooms must be a positive number';
+    if (!formData.features.bathrooms || parseInt(formData.features.bathrooms) <= 0) errors.bathrooms = 'Number of bathrooms must be a positive number';
+    if (!formData.features.area || parseFloat(formData.features.area) <= 0) errors.area = 'Property area must be a positive number';
     return errors;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value
-    }));
-    if (formErrors[name]) {
-      setFormErrors((prev) => ({
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.');
+      setFormData((prev) => ({
         ...prev,
-        [name]: ''
+        [parent]: {
+          ...prev[parent],
+          [child]: value
+        }
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value
       }));
     }
   };
@@ -92,13 +117,43 @@ const EditProperty = () => {
       return;
     }
 
+    setLoading(true);
+    setError(null);
+
     try {
-      await dispatch(updateProperty({ id, propertyData: formData })).unwrap();
+      const formDataToSend = new FormData();
+      formDataToSend.append('title', formData.title.trim());
+      formDataToSend.append('description', formData.description.trim());
+      formDataToSend.append('price', formData.price);
+      formDataToSend.append('type', formData.type);
+      formDataToSend.append('status', formData.status);
+      
+      // Append location data
+      Object.entries(formData.location).forEach(([key, value]) => {
+        formDataToSend.append(`location[${key}]`, value.trim());
+      });
+
+      // Append features data
+      Object.entries(formData.features).forEach(([key, value]) => {
+        formDataToSend.append(`features[${key}]`, value);
+      });
+
+      // Append amenities
+      formData.amenities.forEach(amenity => {
+        formDataToSend.append('amenities[]', amenity);
+      });
+
+      // Append images
+      formData.images.forEach(image => {
+        formDataToSend.append('images', image);
+      });
+
+      await propertyApi.updateProperty(id, formDataToSend, token);
       navigate('/properties');
     } catch (err) {
-      setFormErrors({
-        submit: err.message || 'Failed to update property'
-      });
+      setError(err.message || 'Failed to update property');
+    } finally {
+      setLoading(false);
     }
   };
 

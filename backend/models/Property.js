@@ -17,7 +17,7 @@ const PropertySchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["for-sale", "for-rent", "sold", "rented"],
+    enum: ["Availabe", "Pending", "sold", "rented"],
     default: "for-sale"
   },
   price: {
@@ -47,11 +47,30 @@ const PropertySchema = new mongoose.Schema({
     }
   },
   features: {
-    bedrooms: Number,
-    bathrooms: Number,
-    area: Number, // in square feet
-    parking: Boolean,
-    furnished: Boolean
+    bedrooms: {
+      type: Number,
+      required: [true, "Number of bedrooms is required"]
+    },
+    bathrooms: {
+      type: Number,
+      required: [true, "Number of bathrooms is required"]
+    },
+    area: {
+      type: Number,
+      required: [true, "Property area is required"]
+    },
+    parking: {
+      type: Boolean,
+      default: false
+    },
+    furnished: {
+      type: Boolean,
+      default: false
+    }
+  },
+  amenities: {
+    type: [String],
+    default: []
   },
   images: [{
     type: String,

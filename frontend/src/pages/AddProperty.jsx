@@ -1,25 +1,34 @@
 import { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { createProperty } from '../redux/slices/propertySlice';
+import { useSelector } from 'react-redux';
+import propertyApi from '../api/property';
 
 const AddProperty = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error } = useSelector((state) => state.property);
+  const { token } = useSelector((state) => state.auth);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     price: '',
-    address: '',
     type: 'house',
-    bedrooms: '',
-    bathrooms: '',
-    area: '',
-    images: [],
+    status: 'available',
+    location: {
+      address: '',
+      city: '',
+      state: '',
+      zipCode: ''
+    },
+    features: {
+      bedrooms: '',
+      bathrooms: '',
+      area: '',
+    },
     amenities: [],
-    status: 'available'
+    images: [],
+    address: '' // Add address at root level for form handling
   });
   const [formErrors, setFormErrors] = useState({});
 
@@ -28,23 +37,28 @@ const AddProperty = () => {
     if (!formData.title) errors.title = 'Title is required';
     if (!formData.description) errors.description = 'Description is required';
     if (!formData.price) errors.price = 'Price is required';
-    if (!formData.address) errors.address = 'Address is required';
-    if (!formData.bedrooms) errors.bedrooms = 'Number of bedrooms is required';
-    if (!formData.bathrooms) errors.bathrooms = 'Number of bathrooms is required';
-    if (!formData.area) errors.area = 'Property area is required';
+    if (!formData.location.address) errors.address = 'Address is required';
+    if (!formData.features.bedrooms) errors.bedrooms = 'Number of bedrooms is required';
+    if (!formData.features.bathrooms) errors.bathrooms = 'Number of bathrooms is required';
+    if (!formData.features.area) errors.area = 'Property area is required';
     return errors;
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value
-    }));
-    if (formErrors[name]) {
-      setFormErrors((prev) => ({
+    const { name, value, type, checked } = e.target;
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.');
+      setFormData((prev) => ({
         ...prev,
-        [name]: ''
+        [parent]: {
+          ...prev[parent],
+          [child]: type === 'checkbox' ? checked : value
+        }
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
       }));
     }
   };
@@ -60,60 +74,41 @@ const AddProperty = () => {
   const handleAmenityToggle = (amenity) => {
     setFormData((prev) => ({
       ...prev,
-      amenities: prev.amenities.includes(amenity)
-        ? prev.amenities.filter((a) => a !== amenity)
-        : [...prev.amenities, amenity]
+      amenities: Array.isArray(prev.amenities) && prev.amenities.includes(amenity)
+        ? prev.amenities.filter(a => a !== amenity)
+        : [...(Array.isArray(prev.amenities) ? prev.amenities : []), amenity]
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    // Validate form fields
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
+      setLoading(false);
+      return;
+    }
+
+    // Validate images
+    if (!formData.images || formData.images.length === 0) {
+      setFormErrors(prev => ({ ...prev, images: 'At least one image is required' }));
+      setLoading(false);
       return;
     }
 
     try {
-      const propertyFormData = new FormData();
-      
-      // Add basic property details
-      propertyFormData.append('title', formData.title);
-      propertyFormData.append('description', formData.description);
-      propertyFormData.append('type', formData.type);
-      propertyFormData.append('price', formData.price);
-      propertyFormData.append('status', formData.status);
-      
-      // Add location data
-      const locationData = {
-        address: formData.address,
-        city: formData.city || '',
-        state: formData.state || '',
-        zipCode: formData.zipCode || ''
-      };
-      propertyFormData.append('location', JSON.stringify(locationData));
-      
-      // Add features data
-      const featuresData = {
-        bedrooms: formData.bedrooms,
-        bathrooms: formData.bathrooms,
-        area: formData.area,
-        parking: formData.amenities.includes('Parking'),
-        furnished: formData.amenities.includes('Furnished')
-      };
-      propertyFormData.append('features', JSON.stringify(featuresData));
-      
-      // Add images
-      formData.images.forEach((image) => {
-        propertyFormData.append('images', image);
-      });
-
-      await dispatch(createProperty(propertyFormData)).unwrap();
+      await propertyApi.createProperty(formData, token);
       navigate('/properties');
     } catch (err) {
-      setFormErrors({
-        submit: err.response?.data?.message || err.message || 'Failed to create property'
-      });
+      setError(err.message || 'Failed to create property');
+      // Show the error in the form
+      setFormErrors(prev => ({ ...prev, submit: err.message || 'Failed to create property' }));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -198,14 +193,65 @@ const AddProperty = () => {
               </label>
               <input
                 type="text"
-                name="address"
+                name="location.address"
                 id="address"
-                value={formData.address}
+                value={formData.location.address}
                 onChange={handleChange}
                 className={`mt-1 block w-full rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 ${formErrors.address ? 'border-red-300' : 'border-gray-300'}`}
               />
               {formErrors.address && (
                 <p className="mt-2 text-sm text-red-600">{formErrors.address}</p>
+              )}
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                City
+              </label>
+              <input
+                type="text"
+                name="location.city"
+                id="city"
+                value={formData.location.city}
+                onChange={handleChange}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 ${formErrors.address ? 'border-red-300' : 'border-gray-300'}`}
+              />
+              {formErrors.city && (
+                <p className="mt-2 text-sm text-red-600">{formErrors.state}</p>
+              )}
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                State
+              </label>
+              <input
+                type="text"
+                name="location.state"
+                id="state"
+                value={formData.location.state}
+                onChange={handleChange}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 ${formErrors.address ? 'border-red-300' : 'border-gray-300'}`}
+              />
+              {formErrors.state && (
+                <p className="mt-2 text-sm text-red-600">{formErrors.state}</p>
+              )}
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                ZipCOde
+              </label>
+              <input
+                type="text"
+                name="location.zipCode"
+                id="zipCode"
+                value={formData.location.zipCode}
+                onChange={handleChange}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 ${formErrors.address ? 'border-red-300' : 'border-gray-300'}`}
+              />
+              {formErrors.zipCode && (
+                <p className="mt-2 text-sm text-red-600">{formErrors.zipCode}</p>
               )}
             </div>
 
@@ -251,9 +297,9 @@ const AddProperty = () => {
               </label>
               <input
                 type="number"
-                name="bedrooms"
+                name="features.bedrooms"
                 id="bedrooms"
-                value={formData.bedrooms}
+                value={formData.features.bedrooms}
                 onChange={handleChange}
                 className={`mt-1 block w-full rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 ${formErrors.bedrooms ? 'border-red-300' : 'border-gray-300'}`}
               />
@@ -268,9 +314,9 @@ const AddProperty = () => {
               </label>
               <input
                 type="number"
-                name="bathrooms"
+                name="features.bathrooms"
                 id="bathrooms"
-                value={formData.bathrooms}
+                value={formData.features.bathrooms}
                 onChange={handleChange}
                 className={`mt-1 block w-full rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 ${formErrors.bathrooms ? 'border-red-300' : 'border-gray-300'}`}
               />
@@ -285,9 +331,9 @@ const AddProperty = () => {
               </label>
               <input
                 type="number"
-                name="area"
+                name="features.area"
                 id="area"
-                value={formData.area}
+                value={formData.features.area}
                 onChange={handleChange}
                 className={`mt-1 block w-full rounded-md shadow-sm focus:border-primary-500 focus:ring-primary-500 ${formErrors.area ? 'border-red-300' : 'border-gray-300'}`}
               />
