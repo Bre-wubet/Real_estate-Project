@@ -12,7 +12,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
-import AddProperty from './pages/AddProperty';
+import AddProperty from './pages/AddProperty'
 import EditProperty from './pages/EditProperty';
 import Transactions from './pages/Transactions';
 

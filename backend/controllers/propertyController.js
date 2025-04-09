@@ -1,6 +1,7 @@
 import Property from "../models/Property.js";
 import path from "path";
 import fs from "fs";
+import mongoose from "mongoose";
 
 // Create new property listing
 export const createProperty = async (req, res) => {
@@ -59,8 +60,8 @@ export const createProperty = async (req, res) => {
     // Parse form data
     const {
       title,
-      description,
       price,
+      description,
       type,
       status = 'Available',
       amenities = [],
@@ -136,9 +137,9 @@ export const createProperty = async (req, res) => {
     // Create new property
     const property = new Property({
       title: title.trim(),
+      price: parsedPrice,
       description: description.trim(),
       type,
-      price: parsedPrice,
       status,
       location: {
         address: location.address.trim(),
@@ -247,22 +248,57 @@ export const getProperties = async (req, res) => {
 // Get single property by ID
 export const getPropertyById = async (req, res) => {
   try {
-    const property = await Property.findById(req.params.id)
-      .populate("owner", "name email phoneNumber")
-      .populate("likes", "name");
+    const { id } = req.params;
+
+    // Validate if the ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid property ID",
+        details: "The provided ID is not in the correct format"
+      });
+    }
+
+    let property;
+    try {
+      property = await Property.findById(id)
+        .populate("owner", "name email phoneNumber")
+        .populate("likes", "name")
+        .exec();
+    } catch (dbError) {
+      console.error("Database query error:", dbError);
+      if (dbError.name === 'CastError') {
+        return res.status(400).json({
+          message: "Invalid property ID format",
+          details: "The provided ID is not in the correct format"
+        });
+      }
+      throw dbError; // Re-throw for general error handling
+    }
 
     if (!property) {
-      return res.status(404).json({ message: "Property not found" });
+      return res.status(404).json({
+        message: "Property not found",
+        details: `No property exists with ID: ${id}`
+      });
     }
 
     // Increment views
-    property.views += 1;
-    await property.save();
+    try {
+      property.views = (property.views || 0) + 1;
+      await property.save();
+    } catch (saveError) {
+      console.error("Error updating view count:", saveError);
+      // Continue with response even if view count update fails
+    }
 
     res.json(property);
   } catch (error) {
     console.error("Get property error:", error);
-    res.status(500).json({ message: "Error fetching property" });
+    res.status(500).json({
+      message: "Error fetching property",
+      details: "An unexpected error occurred while retrieving the property",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 

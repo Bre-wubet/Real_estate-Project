@@ -7,10 +7,46 @@ export const register = async (req, res) => {
   try {
     const { name, email, password, role, phoneNumber } = req.body;
 
+    // Validate required fields
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        message: "Missing required fields",
+        details: "Name, email, and password are required"
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        message: "Invalid email format",
+        details: "Please provide a valid email address"
+      });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({
+        message: "Invalid password",
+        details: "Password must be at least 6 characters long"
+      });
+    }
+
+    // Validate role if provided
+    if (role && !['buyer', 'seller', 'admin'].includes(role)) {
+      return res.status(400).json({
+        message: "Invalid role",
+        details: "Role must be either buyer, seller, or admin"
+      });
+    }
+
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+      return res.status(400).json({ 
+        message: "User already exists",
+        details: "This email is already registered"
+      });
     }
 
     // Hash password
@@ -22,32 +58,62 @@ export const register = async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      role,
+      role: role || 'buyer',
       phoneNumber
     });
 
-    await user.save();
+    try {
+      await user.save();
+    } catch (saveError) {
+      if (saveError.name === 'ValidationError') {
+        return res.status(400).json({
+          message: "Validation error",
+          details: Object.values(saveError.errors).map(err => err.message)
+        });
+      }
+      throw saveError;
+    }
+
+    // Check if JWT_SECRET is configured
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET is not configured");
+      return res.status(500).json({
+        message: "Server configuration error",
+        details: "Authentication service is not properly configured"
+      });
+    }
 
     // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" }
-    );
+    try {
+      const token = jwt.sign(
+        { userId: user._id, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "24h" }
+      );
 
-    res.status(201).json({
-      message: "User registered successfully",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
-    });
+      res.status(201).json({
+        message: "User registered successfully",
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        }
+      });
+    } catch (jwtError) {
+      console.error("JWT signing error:", jwtError);
+      return res.status(500).json({
+        message: "Error generating authentication token",
+        details: "Could not complete the registration process"
+      });
+    }
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(500).json({ message: "Error registering user" });
+    res.status(500).json({
+      message: "Error registering user",
+      details: "An unexpected error occurred during registration"
+    });
   }
 };
 
@@ -73,38 +139,91 @@ export const login = async (req, res) => {
       });
     }
 
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: "Invalid email or password" });
+    // Check if JWT_SECRET is configured
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'secret' || process.env.JWT_SECRET.length < 32) {
+      console.error("JWT_SECRET is not properly configured");
+      return res.status(500).json({
+        message: "Server configuration error",
+        details: "Authentication service is not properly configured"
+      });
     }
 
-    // Verify password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid email or password" });
-    }
-
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" }
-    );
-
-    res.json({
-      message: "Login successful",
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
+    // Find user with error handling
+    let user;
+    try {
+      user = await User.findOne({ email }).select('+password');
+      if (!user) {
+        return res.status(400).json({
+          message: "Authentication failed",
+          details: "Invalid email or password"
+        });
       }
-    });
+    } catch (dbError) {
+      console.error("Database error:", dbError);
+      return res.status(500).json({
+        message: "Database error",
+        details: "Could not verify user credentials"
+      });
+    }
+
+    // Verify password with error handling
+    try {
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({
+          message: "Authentication failed",
+          details: "Invalid email or password"
+        });
+      }
+    } catch (bcryptError) {
+      console.error("Password comparison error:", bcryptError);
+      return res.status(500).json({
+        message: "Authentication error",
+        details: "Could not verify password"
+      });
+    }
+
+    // Generate JWT token with error handling
+    try {
+      const token = jwt.sign(
+        { 
+          userId: user._id, 
+          role: user.role,
+          email: user.email 
+        },
+        process.env.JWT_SECRET,
+        { 
+          expiresIn: "24h",
+          algorithm: 'HS256' 
+        }
+      );
+
+      // Send successful response
+      return res.json({
+        message: "Login successful",
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        }
+      });
+
+    } catch (jwtError) {
+      console.error("JWT signing error:", jwtError);
+      return res.status(500).json({
+        message: "Authentication error",
+        details: "Could not generate access token"
+      });
+    }
+
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ message: "Error logging in" });
+    return res.status(500).json({
+      message: "Internal server error",
+      details: "An unexpected error occurred during login"
+    });
   }
 };
 

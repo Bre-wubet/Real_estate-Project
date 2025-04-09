@@ -6,6 +6,10 @@ const PropertySchema = new mongoose.Schema({
     required: [true, "Title is required"],
     trim: true
   },
+  price: {
+    type: Number,
+    required: true
+  },
   description: {
     type: String,
     required: [true, "Description is required"]
@@ -17,13 +21,10 @@ const PropertySchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["Availabe", "Pending", "sold", "rented"],
-    default: "for-sale"
+    enum: ["Available", "Pending", "Sold", "Rented"],
+    default: "Available"
   },
-  price: {
-    type: Number,
-    required: true
-  },
+
   location: {
     address: {
       type: String,
@@ -76,22 +77,7 @@ const PropertySchema = new mongoose.Schema({
     type: String,
     required: [true, "At least one image is required"]
   }],
-  owner: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true
-  },
-  views: {
-    type: Number,
-    default: 0
-  },
-  likes: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User"
-  }]
-}, {
-  timestamps: true
-});
+ });
 
 // Index for search functionality
 PropertySchema.index({ 

@@ -72,9 +72,9 @@ app.get("/", (req, res) => {
 });
 
 // Routes
-app.use('/auth', authRoutes);
-app.use('/properties', propertyRoutes);
-app.use('/transactions', transactionRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/properties', propertyRoutes);
+app.use('/api/transactions', transactionRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
