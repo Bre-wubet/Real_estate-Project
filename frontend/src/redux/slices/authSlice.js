@@ -98,6 +98,10 @@ const authSlice = createSlice({
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
+        state.error = action.payload || { message: 'Login failed. Please try again.' };
+        state.isAuthenticated = false;
+        state.user = null;
+        state.token = null;
         state.error = action.payload?.message || 'Login failed';
       })
       // Register

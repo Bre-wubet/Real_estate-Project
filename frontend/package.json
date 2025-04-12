@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "generate-ssl": "node scripts/generate-ssl.js",
+    "predev": "node scripts/generate-ssl.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"

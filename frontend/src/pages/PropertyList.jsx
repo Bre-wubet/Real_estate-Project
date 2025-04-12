@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { Search as SearchIcon } from '@mui/icons-material';
+import { fetchProperties, setFilters } from '../redux/slices/propertySlice';
 
 const PropertyList = () => {
   const navigate = useNavigate();
@@ -10,37 +11,31 @@ const PropertyList = () => {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Get search query from URL parameters
+  const dispatch = useDispatch();
+  const { properties: reduxProperties, loading: reduxLoading } = useSelector(state => state.property);
+
+  // Get search query from URL parameters and fetch properties
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const searchParam = params.get('search');
     if (searchParam) {
       setSearchQuery(searchParam);
-      // TODO: Fetch properties based on search query
+      dispatch(setFilters({ search: searchParam }));
     }
-  }, [location.search]);
+    dispatch(fetchProperties());
+  }, [dispatch, location.search]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     navigate(`/properties?search=${encodeURIComponent(searchQuery)}`);
-    // TODO: Fetch properties based on search query
+    dispatch(setFilters({ search: searchQuery }));
+    dispatch(fetchProperties());
   };
 
-  // Temporary mock data
   useEffect(() => {
-    const mockProperties = Array.from({ length: 9 }, (_, index) => ({
-      id: index + 1,
-      title: `Luxury Villa ${index + 1}`,
-      description: 'Beautiful property with modern amenities and stunning views',
-      price: (1 + index) * 199000,
-      location: 'Prime Location',
-      bedrooms: 4,
-      bathrooms: 3,
-      area: 2500,
-    }));
-    setProperties(mockProperties);
-    setLoading(false);
-  }, []);
+    setProperties(reduxProperties);
+    setLoading(reduxLoading);
+  }, [reduxProperties, reduxLoading]);
 
   if (loading) {
     return (
@@ -87,23 +82,44 @@ const PropertyList = () => {
             key={property.id}
             className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow"
           >
-            <div className="aspect-w-16 aspect-h-9 bg-gray-200" />
+            <div className="aspect-w-16 aspect-h-9 bg-gray-200">
+              {property.images && property.images[0] && (
+                <img
+                  src={property.images[0]}
+                  alt={property.title}
+                  className="object-cover w-full h-full"
+                />
+              )}
+            </div>
             <div className="p-6 space-y-4">
               <h3 className="text-xl font-semibold text-gray-900">
                 {property.title}
               </h3>
-              <div className="flex gap-4 text-sm text-gray-600">
-                <span>{property.bedrooms} beds</span>
-                <span>{property.bathrooms} baths</span>
-                <span>{property.area} sqft</span>
+              <div className="text-sm text-gray-600">
+                <p className="mb-2">
+                  {property.location?.city}, {property.location?.state}
+                </p>
+                <div className="flex gap-4">
+                  <span>{property.features?.bedrooms || 0} beds</span>
+                  <span>{property.features?.bathrooms || 0} baths</span>
+                  <span>{property.features?.area || 0} sqft</span>
+                </div>
               </div>
               <p className="text-gray-600">{property.description}</p>
+              <div className="flex flex-col space-y-2">
+                {property.features?.type && (
+                  <span className="text-sm text-gray-600">Type: {property.features.type}</span>
+                )}
+                {property.features?.status && (
+                  <span className="text-sm text-gray-600">Status: {property.features.status}</span>
+                )}
+              </div>
               <div className="flex justify-between items-center">
                 <span className="text-primary-600 font-bold text-xl">
-                  ${property.price.toLocaleString()}
+                  ${property.price?.toLocaleString() || 'Price on request'}
                 </span>
                 <button
-                  onClick={() => navigate(`/properties/${property.id}`)}
+                  onClick={() => navigate(`/properties/${property._id}`)}
                   className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
                 >
                   View Details

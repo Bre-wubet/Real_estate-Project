@@ -1,11 +1,19 @@
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Define paths
+const CERT_DIR = path.join(__dirname, '..', '.cert');
+const KEY_PATH = path.join(CERT_DIR, 'key.pem');
+const CERT_PATH = path.join(CERT_DIR, 'cert.pem');
 
 // Create .cert directory if it doesn't exist
-const certDir = path.join(__dirname, '..', '.cert');
-if (!fs.existsSync(certDir)) {
-  fs.mkdirSync(certDir, { recursive: true });
+if (!fs.existsSync(CERT_DIR)) {
+  fs.mkdirSync(CERT_DIR, { recursive: true });
 }
 
 // Generate SSL certificate using OpenSSL
@@ -13,20 +21,20 @@ try {
   console.log('Generating SSL certificates...');
   
   // Generate private key
-  execSync('openssl genrsa -out .cert/key.pem 2048');
-  
-  // Generate certificate signing request
-  execSync('openssl req -new -key .cert/key.pem -out .cert/csr.pem -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"');
-  
-  // Generate self-signed certificate
-  execSync('openssl x509 -req -days 365 -in .cert/csr.pem -signkey .cert/key.pem -out .cert/cert.pem');
-  
-  // Remove CSR file as it's no longer needed
-  fs.unlinkSync(path.join(certDir, 'csr.pem'));
-  
+  execSync(
+    'openssl genrsa -out "' + KEY_PATH + '" 2048',
+    { stdio: 'inherit' }
+  );
+
+  // Generate certificate
+  execSync(
+    'openssl req -new -x509 -key "' + KEY_PATH + '" -out "' + CERT_PATH + '" -days 365 -subj "/CN=localhost"',
+    { stdio: 'inherit' }
+  );
+
   console.log('SSL certificates generated successfully!');
-  console.log('Location:', certDir);
+  console.log('Certificate files created at:', CERT_DIR);
 } catch (error) {
-  console.error('Error generating SSL certificates:', error.message);
+  console.error('Error generating SSL certificates:', error);
   process.exit(1);
 }

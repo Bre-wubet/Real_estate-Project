@@ -77,7 +77,20 @@ const PropertySchema = new mongoose.Schema({
     type: String,
     required: [true, "At least one image is required"]
   }],
- });
+  owner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+  },
+  likes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User"
+  }],
+  views: {
+    type: Number,
+    default: 0
+  }
+});
 
 // Index for search functionality
 PropertySchema.index({ 

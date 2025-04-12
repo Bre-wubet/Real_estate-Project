@@ -140,11 +140,11 @@ export const login = async (req, res) => {
     }
 
     // Check if JWT_SECRET is configured
-    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'secret' || process.env.JWT_SECRET.length < 32) {
-      console.error("JWT_SECRET is not properly configured");
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET is not configured");
       return res.status(500).json({
         message: "Server configuration error",
-        details: "Authentication service is not properly configured"
+        details: "Authentication service is not properly configured. Please check server environment variables."
       });
     }
 

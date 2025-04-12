@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { auth } from '../middleware/auth.js';
+import { login } from '../controllers/authController.js';
 
 const router = express.Router();
 
@@ -56,7 +57,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// @route   POST /auth/login
+// @route   POST /api/auth/login
 // @desc    Authenticate user & get token
 // @access  Public
 router.post('/login', login);

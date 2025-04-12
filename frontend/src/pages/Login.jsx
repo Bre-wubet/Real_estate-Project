@@ -55,7 +55,7 @@ const Login = () => {
       navigate('/');
     } catch (err) {
       setFormErrors({
-        submit: err.message || 'Login failed. Please try again.'
+        submit: err.details || err.message || 'Login failed. Please try again.'
       });
     }
   };

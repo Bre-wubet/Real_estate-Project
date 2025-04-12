@@ -64,10 +64,22 @@ export const createProperty = async (req, res) => {
       description,
       type,
       status = 'Available',
-      amenities = [],
-      location = {},
-      features = {}
+      amenities = []
     } = req.body;
+
+    // Parse location and features from JSON strings
+    let location = {};
+    let features = {};
+    try {
+      location = typeof req.body.location === 'string' ? JSON.parse(req.body.location) : req.body.location || {};
+      features = typeof req.body.features === 'string' ? JSON.parse(req.body.features) : req.body.features || {};
+    } catch (error) {
+      console.error('Error parsing location or features:', error);
+      return res.status(400).json({
+        message: "Invalid location or features format",
+        details: "Location and features must be valid JSON objects"
+      });
+    }
 
     // Validate features
     if (!features.bedrooms || !features.bathrooms || !features.area) {
@@ -78,10 +90,19 @@ export const createProperty = async (req, res) => {
     }
 
     // Validate required fields
-    if (!title?.trim() || !description?.trim() || !type || !price) {
+    if (!title?.trim() || !description?.trim() || !type || !price || isNaN(parseFloat(price))) {
       return res.status(400).json({ 
-        message: "Missing required fields",
-        details: "Title, description, type, and price are required"
+        message: "Missing or invalid required fields",
+        details: "Title, description, type, and a valid numeric price are required"
+      });
+    }
+
+    // Validate price format
+    const numericPrice = parseFloat(price);
+    if (numericPrice <= 0) {
+      return res.status(400).json({
+        message: "Invalid price",
+        details: "Price must be greater than 0"
       });
     }
 
@@ -212,36 +233,174 @@ export const getProperties = async (req, res) => {
       limit = 10
     } = req.query;
 
+    // Validate pagination parameters
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    if (isNaN(pageNum) || pageNum < 1) {
+      return res.status(400).json({
+        message: "Invalid page number",
+        details: "Page number must be a positive integer"
+      });
+    }
+    if (isNaN(limitNum) || limitNum < 1 || limitNum > 50) {
+      return res.status(400).json({
+        message: "Invalid limit value",
+        details: "Limit must be between 1 and 50"
+      });
+    }
+
     const query = {};
 
-    // Apply filters
-    if (type) query.type = type;
-    if (status) query.status = status;
-    if (city) query["location.city"] = new RegExp(city, "i");
-    if (state) query["location.state"] = new RegExp(state, "i");
-    if (bedrooms) query["features.bedrooms"] = { $gte: parseInt(bedrooms) };
-    if (bathrooms) query["features.bathrooms"] = { $gte: parseInt(bathrooms) };
-    if (minPrice) query.price = { $gte: parseFloat(minPrice) };
-    if (maxPrice) query.price = { ...query.price, $lte: parseFloat(maxPrice) };
-    if (search) query.$text = { $search: search };
+    // Validate and apply type filter
+    if (type) {
+      const validTypes = ["house", "apartment", "condo", "land", "commercial"];
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({
+          message: "Invalid property type",
+          validTypes
+        });
+      }
+      query.type = type;
+    }
 
-    const properties = await Property.find(query)
-      .populate("owner", "name email phoneNumber")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
+    // Validate and apply status filter
+    if (status) {
+      const validStatuses = ["Available", "Pending", "Sold", "Rented"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          message: "Invalid property status",
+          validStatuses
+        });
+      }
+      query.status = status;
+    }
 
-    const total = await Property.countDocuments(query);
+    // Apply location filters with case-insensitive search
+    if (city?.trim()) query["location.city"] = new RegExp(city.trim(), "i");
+    if (state?.trim()) query["location.state"] = new RegExp(state.trim(), "i");
 
-    res.json({
-      properties,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      total
-    });
+    // Validate and apply numeric filters
+    if (bedrooms) {
+      const bedroomsNum = parseInt(bedrooms);
+      if (isNaN(bedroomsNum) || bedroomsNum < 0) {
+        return res.status(400).json({
+          message: "Invalid bedrooms value",
+          details: "Number of bedrooms must be a non-negative integer"
+        });
+      }
+      query["features.bedrooms"] = { $gte: bedroomsNum };
+    }
+
+    if (bathrooms) {
+      const bathroomsNum = parseInt(bathrooms);
+      if (isNaN(bathroomsNum) || bathroomsNum < 0) {
+        return res.status(400).json({
+          message: "Invalid bathrooms value",
+          details: "Number of bathrooms must be a non-negative integer"
+        });
+      }
+      query["features.bathrooms"] = { $gte: bathroomsNum };
+    }
+
+    // Validate and apply price range filters
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) {
+        const minPriceNum = parseFloat(minPrice);
+        if (isNaN(minPriceNum) || minPriceNum < 0) {
+          return res.status(400).json({
+            message: "Invalid minimum price",
+            details: "Minimum price must be a non-negative number"
+          });
+        }
+        query.price.$gte = minPriceNum;
+      }
+      if (maxPrice) {
+        const maxPriceNum = parseFloat(maxPrice);
+        if (isNaN(maxPriceNum) || maxPriceNum < 0) {
+          return res.status(400).json({
+            message: "Invalid maximum price",
+            details: "Maximum price must be a non-negative number"
+          });
+        }
+        if (minPrice && maxPriceNum < parseFloat(minPrice)) {
+          return res.status(400).json({
+            message: "Invalid price range",
+            details: "Maximum price must be greater than minimum price"
+          });
+        }
+        query.price.$lte = maxPriceNum;
+      }
+    }
+
+    // Apply text search if provided
+    if (search?.trim()) {
+      try {
+        query.$text = { $search: search.trim() };
+      } catch (searchError) {
+        console.error('Text search error:', searchError);
+        return res.status(400).json({
+          message: "Invalid search query",
+          details: "Please check your search terms and try again"
+        });
+      }
+    }
+
+    // Execute database queries with proper error handling
+    try {
+      const [properties, total] = await Promise.all([
+        Property.find(query)
+          .populate("owner", "name email phoneNumber")
+          .sort({ createdAt: -1 })
+          .skip((pageNum - 1) * limitNum)
+          .limit(limitNum)
+          .lean()
+          .exec(),
+        Property.countDocuments(query)
+      ]);
+
+      if (!Array.isArray(properties)) {
+        throw new Error('Invalid properties result format');
+      }
+
+      return res.json({
+        properties,
+        totalPages: Math.ceil(total / limitNum),
+        currentPage: pageNum,
+        total,
+        limit: limitNum
+      });
+
+    } catch (dbError) {
+      console.error('Database query error:', dbError);
+      throw dbError;
+    }
+
   } catch (error) {
-    console.error("Get properties error:", error);
-    res.status(500).json({ message: "Error fetching properties" });
+    console.error("Get properties error:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        message: "Invalid parameter format",
+        details: error.message
+      });
+    }
+
+    if (error.name === 'MongoServerError') {
+      return res.status(500).json({
+        message: "Database error",
+        details: "Error connecting to the database"
+      });
+    }
+
+    return res.status(500).json({
+      message: "Error fetching properties",
+      details: "An unexpected error occurred while retrieving properties"
+    });
   }
 };
 

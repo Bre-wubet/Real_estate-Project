@@ -15,6 +15,13 @@ import propertyRoutes from './routes/property.js';
 import transactionRoutes from './routes/transaction.js';
 
 dotenv.config();
+
+// Validate required environment variables
+if (!process.env.JWT_SECRET) {
+  console.error('JWT_SECRET is not set in environment variables');
+  process.exit(1);
+}
+
 const app = express();
 
 // Configure multer for file uploads
