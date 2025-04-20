@@ -44,7 +44,7 @@ router.post('/register', async (req, res) => {
 
     jwt.sign(
       payload,
-      process.env.JWT_SECRET || 'your-secret-key',
+      process.env.JWT_SECRET || 'secret',
       { expiresIn: '24h' },
       (err, token) => {
         if (err) throw err;
